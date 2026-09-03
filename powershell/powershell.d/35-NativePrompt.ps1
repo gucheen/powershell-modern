@@ -1,14 +1,3 @@
-$global:PowerShellModernIsAdministrator = $false
-try {
-    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal -ArgumentList $identity
-    $global:PowerShellModernIsAdministrator = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
-catch {
-    $global:PowerShellModernIsAdministrator = $false
-}
-Remove-Variable identity, principal -ErrorAction SilentlyContinue
-
 $global:PowerShellModernGitCommand = Get-Command git -CommandType Application -ErrorAction SilentlyContinue
 
 function Format-PowerShellModernPath {
@@ -144,17 +133,13 @@ function global:prompt {
     else {
         0
     }
-    $userColor = if ($global:PowerShellModernIsAdministrator) { 'Red' } else { 'Gray' }
-    $userName = if ($env:USERNAME) { $env:USERNAME } else { [Environment]::UserName }
-    $hostName = if ($env:COMPUTERNAME) { $env:COMPUTERNAME } else { [Environment]::MachineName }
     $location = $ExecutionContext.SessionState.Path.CurrentLocation
     $displayPath = Format-PowerShellModernPath -Path $location.Path
     $gitStatus = if ($location.Provider.Name -eq 'FileSystem') {
         Get-PowerShellModernGitStatus -Path $location.Path
     }
 
-    Write-Host "$userName@$hostName" -NoNewline -ForegroundColor $userColor
-    Write-Host " $displayPath" -NoNewline -ForegroundColor Cyan
+    Write-Host $displayPath -NoNewline -ForegroundColor Cyan
     if ($gitStatus) {
         $flags = ''
         if ($gitStatus.Staged) { $flags += '+' }

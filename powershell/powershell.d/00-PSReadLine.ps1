@@ -20,5 +20,3 @@ if (Get-Module -Name PSReadLine) {
     Set-PSReadLineKeyHandler -Key Alt+f -Function ForwardWord
     Set-PSReadLineKeyHandler -Key Alt+Backspace -Function BackwardKillWord
 }
-
-$global:MaximumHistoryCount = 50000

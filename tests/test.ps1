@@ -17,6 +17,11 @@ try {
     $hiddenPath = Format-PowerShellModernPath -Path 'C:\Users\alice\.config\powershell-modern\user' -HomePath 'C:\Users\alice'
     if ($hiddenPath -ne '~\.c\p\user') { throw "Unexpected hidden path: $hiddenPath" }
 
+    $sessionHistoryCount = $global:MaximumHistoryCount
+    . (Join-Path $projectRoot 'powershell\powershell.d\00-PSReadLine.ps1')
+    if ((Get-PSReadLineOption).MaximumHistoryCount -ne 50000) { throw 'PSReadLine history count was not configured' }
+    if ($global:MaximumHistoryCount -ne $sessionHistoryCount) { throw 'PowerShell session history count was unexpectedly changed' }
+
     if (Get-Command git -CommandType Application -ErrorAction SilentlyContinue) {
         $gitRoot = Join-Path $testRoot 'git-status'
         & git init --quiet $gitRoot
