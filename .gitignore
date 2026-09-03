@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+/local.sh
+/local.ps1
+/private-commands/
