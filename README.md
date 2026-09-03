@@ -40,15 +40,17 @@ powershell-modern doctor
 默认配置位置为：
 
 ```text
-~/.config/powershell-modern/
+$HOME\.config\powershell-modern\
 ├── profile.ps1
-├── powershell.d/
-├── commands.d/
-├── bin/
-└── user/
+├── powershell.d\
+├── commands.d\
+├── bin\
+└── user\
 ```
 
-安装结果是项目文件的副本，不依赖原项目目录。重复运行安装器会更新受管代码，同时保留 `user/` 内容和 Profile 中的非受管配置。
+本文中的 `$HOME` 指 PowerShell 的用户主目录变量；在 Windows 上通常对应 `C:\Users\<用户名>`。
+
+安装结果是项目文件的副本，不依赖原项目目录。重复运行安装器会更新受管代码，同时保留 `user\` 内容和 Profile 中的非受管配置。
 
 可用以下环境变量覆盖路径，便于定制安装或测试：
 
@@ -71,7 +73,7 @@ PSReadLine 使用增量保存历史，最多保留 50,000 条，并忽略重复�
 
 ## 提示符
 
-提示符会保留当前目录名，并将上级目录缩写为首字符，例如 `~\projects\powershell-modern` 会显示为 `~\p\powershell-modern`。在 Git 仓库中还会显示分支及以下状态标记：
+提示符会保留当前目录名，并将上级目录缩写为首字符，例如 `$HOME\projects\powershell-modern` 会显示为 `~\p\powershell-modern`。这里的 `~` 只是提示符用来表示用户主目录的显示标记，不是传给 Windows 程序的文件路径。在 Git 仓库中还会显示分支及以下状态标记：
 
 - `+`：有已暂存的改动。
 - `!`：有未暂存的改动。
@@ -89,7 +91,7 @@ abbr -Show
 abbr -Erase gs
 ```
 
-个人缩写保存在 `~/.config/powershell-modern/user/abbreviations.json`，项目更新时会保留。命令包中应使用只对当前会话声明的形式：
+个人缩写保存在 `$HOME\.config\powershell-modern\user\abbreviations.json`，项目更新时会保留。命令包中应使用只对当前会话声明的形式：
 
 ```powershell
 abbr -Define docs 'Set-Location C:\src\docs'
@@ -101,16 +103,16 @@ abbr -Define docs 'Set-Location C:\src\docs'
 
 | 层级 | 默认位置 | 用途 |
 |---|---|---|
-| 公开通用 | `~/.config/powershell-modern/commands.d/` | 随项目更新的 Windows 原生命令 |
-| 私有命令包 | `~/.config/powershell-modern-commands/` | 跨电脑同步的私有命令 |
-| 单机配置 | `~/.config/powershell-modern/user/local.ps1` | 本机路径与本机函数 |
+| 公开通用 | `$HOME\.config\powershell-modern\commands.d\` | 随项目更新的 Windows 原生命令 |
+| 私有命令包 | `$HOME\.config\powershell-modern-commands\` | 跨电脑同步的私有命令 |
+| 单机配置 | `$HOME\.config\powershell-modern\user\local.ps1` | 本机路径与本机函数 |
 
 后加载的函数可以覆盖前一层。私有命令包的目录结构为：
 
 ```text
-powershell-modern-commands/
+powershell-modern-commands\
 ├── abbreviations.ps1
-└── commands.d/
+└── commands.d\
     ├── navigation.ps1
     └── services.ps1
 ```
@@ -134,7 +136,7 @@ cmds network
 cmds --sources
 ```
 
-单机配置模板位于 `examples/local.example.ps1`，私有命令包示例位于 `examples/private-commands/`。
+单机配置模板位于 `examples\local.example.ps1`，私有命令包示例位于 `examples\private-commands\`。
 
 ## 原生命令
 
