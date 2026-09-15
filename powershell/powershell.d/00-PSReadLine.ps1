@@ -3,8 +3,7 @@ if (-not (Get-Module -Name PSReadLine)) {
 }
 
 if (Get-Module -Name PSReadLine) {
-    Set-PSReadLineOption -HistorySaveStyle SaveIncrementally -MaximumHistoryCount 50000
-    Set-PSReadLineOption -HistoryNoDuplicates:$true
+    Set-PSReadLineOption -HistorySaveStyle SaveIncrementally -MaximumHistoryCount 50000 -HistoryNoDuplicates:$true
 
     try {
         Set-PSReadLineOption -PredictionSource History
@@ -15,8 +14,7 @@ if (Get-Module -Name PSReadLine) {
     }
 
     Set-PSReadLineKeyHandler -Key RightArrow -Function ForwardChar
-    Set-PSReadLineKeyHandler -Key Ctrl+f -Function ForwardWord
+    Set-PSReadLineKeyHandler -Key Ctrl+f, Alt+f -Function ForwardWord
     Set-PSReadLineKeyHandler -Key End -Function EndOfLine
-    Set-PSReadLineKeyHandler -Key Alt+f -Function ForwardWord
     Set-PSReadLineKeyHandler -Key Alt+Backspace -Function BackwardKillWord
 }

@@ -1,4 +1,6 @@
-$global:PowerShellModernGitCommand = Get-Command git -CommandType Application -ErrorAction SilentlyContinue
+# Resolve only the executable PowerShell would run; avoid scanning the rest of PATH
+# and returning an array when several Git installations are present.
+$global:PowerShellModernGitCommand = Get-Command git -CommandType Application -TotalCount 1 -ErrorAction SilentlyContinue
 
 function Format-PowerShellModernPath {
     param(

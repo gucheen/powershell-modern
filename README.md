@@ -170,6 +170,34 @@ powershell-modern rollback <备份目录名或完整路径>
 
 ## 验证
 
+### 启动耗时
+
+排查启动慢时，更新安装后，在现有 PowerShell 中执行：
+
+```powershell
+$env:POWERSHELL_MODERN_TRACE_STARTUP = '1'
+pwsh -NoLogo
+```
+
+在新打开的会话中查看各模块耗时（毫秒）：
+
+```powershell
+$PowerShellModernStartupTimings | Format-Table -AutoSize
+```
+
+Windows PowerShell 5.1 请将 `pwsh` 换成 `powershell`。每次比较都启动新进程；同一会话重复加载会被防重入检查跳过，无法测到真实启动耗时。
+
+`Total (powershell-modern)` 是本项目加载器的耗时，包含模块查找和加载。PowerShell 启动时显示的 Profile 总耗时还可能包含其他 Profile；首次提示符中的 `git status` 不计入这里的模块加载时间。不要将各模块与 Total 再相加。
+
+- `00-PSReadLine.ps1`：PSReadLine 导入、历史选项和按键配置。
+- `35-NativePrompt.ps1`：提示符定义与 Git 可执行文件查找。
+- `40-Abbreviations.ps1`：个人缩写读取与权限检查。
+- `45-CommandLibrary.ps1`：通用命令、私有命令包和 `user\local.ps1` 的加载。
+
+计时默认关闭，不会输出启动信息。排查结束后先 `exit` 返回原会话，再执行 `Remove-Item Env:POWERSHELL_MODERN_TRACE_STARTUP`。
+
+### 功能测试
+
 测试只使用临时 HOME 和 Profile，不修改真实用户配置：
 
 ```powershell
