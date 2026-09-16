@@ -9,14 +9,30 @@ function Test-PowerShellModernPrivateSource {
     }
 
     try {
-        $acl = Get-Acl -LiteralPath $Path
-        $currentSid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-        $ownerSid = $acl.Owner
+        # Avoid importing Microsoft.PowerShell.Security on the startup path.
+        # Read SIDs directly: resolving account names and translating them back
+        # adds work and can involve domain lookups.
+        if ($PSVersionTable.PSEdition -eq 'Core') {
+            $item = if ([IO.Directory]::Exists($Path)) {
+                [IO.DirectoryInfo]::new($Path)
+            }
+            else {
+                [IO.FileInfo]::new($Path)
+            }
+            $acl = [IO.FileSystemAclExtensions]::GetAccessControl(
+                $item, [Security.AccessControl.AccessControlSections]'Owner, Access')
+        }
+        else {
+            $acl = Get-Acl -LiteralPath $Path
+        }
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
         try {
-            $ownerSid = ([Security.Principal.NTAccount] $acl.Owner).Translate([Security.Principal.SecurityIdentifier]).Value
+            $currentSid = $identity.User.Value
         }
-        catch {
+        finally {
+            $identity.Dispose()
         }
+        $ownerSid = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
         if ($ownerSid -ne $currentSid) {
             return $false
         }
@@ -25,17 +41,11 @@ function Test-PowerShellModernPrivateSource {
         $writeRights = [Security.AccessControl.FileSystemRights]::Write -bor
             [Security.AccessControl.FileSystemRights]::Modify -bor
             [Security.AccessControl.FileSystemRights]::FullControl
-        foreach ($rule in $acl.Access) {
+        foreach ($rule in $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
             if ($rule.AccessControlType -ne [Security.AccessControl.AccessControlType]::Allow) {
                 continue
             }
-            $sid = $rule.IdentityReference
-            try {
-                $sid = $rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value
-            }
-            catch {
-                $sid = $rule.IdentityReference.Value
-            }
+            $sid = $rule.IdentityReference.Value
             if ($broadSids -contains $sid -and (($rule.FileSystemRights -band $writeRights) -ne 0)) {
                 return $false
             }

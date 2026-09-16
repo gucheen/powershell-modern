@@ -88,7 +88,36 @@ elseif (Get-Variable PowerShellModernStartupTimings -Scope Global -ErrorAction S
     }
 
     . (Join-Path $env:POWERSHELL_MODERN_HOME 'powershell.d\40-Abbreviations.ps1')
+    if ($env:OS -eq 'Windows_NT') {
+        $aclTestDirectory = Join-Path $testRoot 'acl-check'
+        New-Item -ItemType Directory -Path $aclTestDirectory | Out-Null
+        $aclTestFile = Join-Path $aclTestDirectory 'source.ps1'
+        Set-Content -LiteralPath $aclTestFile -Value '# ACL test'
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        try { $testSid = $identity.User } finally { $identity.Dispose() }
+        foreach ($aclTestPath in @($aclTestDirectory, $aclTestFile)) {
+            $acl = Get-Acl -LiteralPath $aclTestPath
+            $acl.SetAccessRuleProtection($true, $false)
+            $acl.SetOwner($testSid)
+            $ownerRule = [Security.AccessControl.FileSystemAccessRule]::new($testSid, 'FullControl', 'Allow')
+            $acl.SetAccessRule($ownerRule)
+            Set-Acl -LiteralPath $aclTestPath -AclObject $acl
+            if (-not (Test-PowerShellModernPrivateSource $aclTestPath)) { throw 'Private source was rejected' }
+            foreach ($broadSid in @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545')) {
+                $rule = [Security.AccessControl.FileSystemAccessRule]::new(
+                    [Security.Principal.SecurityIdentifier]::new($broadSid), 'Write', 'Allow')
+                $acl.AddAccessRule($rule)
+                Set-Acl -LiteralPath $aclTestPath -AclObject $acl
+                if (Test-PowerShellModernPrivateSource $aclTestPath) { throw "Broadly writable source was accepted: $broadSid" }
+                $acl.RemoveAccessRuleSpecific($rule)
+                Set-Acl -LiteralPath $aclTestPath -AclObject $acl
+                if (-not (Test-PowerShellModernPrivateSource $aclTestPath)) { throw 'Updated ACL was not rechecked' }
+            }
+        }
+        if (Test-PowerShellModernPrivateSource (Join-Path $testRoot 'missing.ps1')) { throw 'Missing source was accepted' }
+    }
     abbr -Add gs Get-Service
+    . (Join-Path $env:POWERSHELL_MODERN_HOME 'powershell.d\40-Abbreviations.ps1')
     if (@(abbr -List) -notcontains 'gs') { throw 'Personal abbreviation was not added' }
     abbr -Define gs 'Get-Service -Name Spooler'
     if ($global:PowerShellModernAbbreviations['gs'] -ne 'Get-Service') { throw 'Shared abbreviation overrode a personal abbreviation' }
