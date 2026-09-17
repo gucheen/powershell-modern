@@ -12,18 +12,19 @@ function Test-PowerShellModernPrivateSource {
         # Avoid importing Microsoft.PowerShell.Security on the startup path.
         # Read SIDs directly: resolving account names and translating them back
         # adds work and can involve domain lookups.
-        if ($PSVersionTable.PSEdition -eq 'Core') {
-            $item = if ([IO.Directory]::Exists($Path)) {
-                [IO.DirectoryInfo]::new($Path)
-            }
-            else {
-                [IO.FileInfo]::new($Path)
-            }
-            $acl = [IO.FileSystemAclExtensions]::GetAccessControl(
-                $item, [Security.AccessControl.AccessControlSections]'Owner, Access')
+        $item = if ([IO.Directory]::Exists($Path)) {
+            [IO.DirectoryInfo]::new($Path)
         }
         else {
-            $acl = Get-Acl -LiteralPath $Path
+            [IO.FileInfo]::new($Path)
+        }
+        $sections = [Security.AccessControl.AccessControlSections]'Owner, Access'
+        if ($PSVersionTable.PSEdition -eq 'Core') {
+            $acl = [IO.FileSystemAclExtensions]::GetAccessControl(
+                $item, $sections)
+        }
+        else {
+            $acl = $item.GetAccessControl($sections)
         }
         $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
         try {

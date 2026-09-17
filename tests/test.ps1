@@ -52,43 +52,41 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $env:POWERSHELL_MODERN_HOME 'commands.d\20-Common.ps1'))) { throw 'Command library is missing' }
 
     # Use fresh processes so module caches and the loader guard cannot hide failures.
-    $startupProbe = Join-Path $testRoot 'startup-probe.ps1'
-    Set-Content -LiteralPath $startupProbe -Encoding UTF8 -Value @'
-param([string] $Trace)
+    $loaderProbe = Join-Path $testRoot 'loader-probe.ps1'
+    Set-Content -LiteralPath $loaderProbe -Encoding UTF8 -Value @'
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
-$env:POWERSHELL_MODERN_TRACE_STARTUP = $Trace
 $loader = Join-Path $env:POWERSHELL_MODERN_HOME 'profile.ps1'
 . $loader
 if (-not (Get-Command ports -ErrorAction SilentlyContinue)) { throw 'Loader did not load commands' }
-if ($Trace -eq '1') {
-    $timings = $global:PowerShellModernStartupTimings
-    $moduleCount = @(Get-ChildItem (Join-Path $env:POWERSHELL_MODERN_HOME 'powershell.d') -Filter '*.ps1').Count
-    if ($timings.Count -ne ($moduleCount + 1)) { throw 'Startup timings are incomplete' }
-    if ($timings[-1].Stage -ne 'Total (powershell-modern)') { throw 'Startup total is missing' }
-    foreach ($timing in $timings) {
-        if ($timing.Milliseconds -lt 0 -or $timing.Milliseconds -gt $timings[-1].Milliseconds) {
-            throw 'Invalid startup timing'
-        }
-    }
-    . $loader
-    if (-not [object]::ReferenceEquals($timings, $global:PowerShellModernStartupTimings)) {
-        throw 'Repeated loading replaced the startup timings'
-    }
+if ($env:OS -eq 'Windows_NT') {
+    if (-not (Test-PowerShellModernPrivateSource $loader)) { throw 'Private source check failed in a fresh process' }
+    if (Get-Module Microsoft.PowerShell.Security) { throw 'Private source check imported the Security module' }
 }
-elseif (Get-Variable PowerShellModernStartupTimings -Scope Global -ErrorAction SilentlyContinue) {
-    throw 'Startup tracing should be disabled by default'
+$sources = $global:PowerShellModernCommandSources
+. $loader
+if (-not [object]::ReferenceEquals($sources, $global:PowerShellModernCommandSources)) {
+    throw 'Repeated loading replaced the command sources'
 }
-'startup probe passed'
+'loader probe passed'
 '@
     $shellExecutable = if ($PSVersionTable.PSEdition -eq 'Core') { Join-Path $PSHOME 'pwsh.exe' } else { Join-Path $PSHOME 'powershell.exe' }
-    foreach ($trace in @('1', '0')) {
-        $probeOutput = & $shellExecutable -NoLogo -NoProfile -File $startupProbe -Trace $trace
-        if ($LASTEXITCODE -ne 0 -or $probeOutput -notcontains 'startup probe passed') { throw 'Startup probe failed' }
-    }
+    $probeOutput = & $shellExecutable -NoLogo -NoProfile -File $loaderProbe
+    if ($LASTEXITCODE -ne 0 -or $probeOutput -notcontains 'loader probe passed') { throw 'Loader probe failed' }
 
     . (Join-Path $env:POWERSHELL_MODERN_HOME 'powershell.d\40-Abbreviations.ps1')
     if ($env:OS -eq 'Windows_NT') {
+        function Set-TestSourceAcl {
+            param([string] $Path, $Acl)
+            $item = if ([IO.Directory]::Exists($Path)) { [IO.DirectoryInfo]::new($Path) } else { [IO.FileInfo]::new($Path) }
+            # Persist only the changed owner/access sections.
+            if ($PSVersionTable.PSEdition -eq 'Core') {
+                [IO.FileSystemAclExtensions]::SetAccessControl($item, $Acl)
+            }
+            else {
+                $item.SetAccessControl($Acl)
+            }
+        }
         $aclTestDirectory = Join-Path $testRoot 'acl-check'
         New-Item -ItemType Directory -Path $aclTestDirectory | Out-Null
         $aclTestFile = Join-Path $aclTestDirectory 'source.ps1'
@@ -97,20 +95,27 @@ elseif (Get-Variable PowerShellModernStartupTimings -Scope Global -ErrorAction S
         try { $testSid = $identity.User } finally { $identity.Dispose() }
         foreach ($aclTestPath in @($aclTestDirectory, $aclTestFile)) {
             $acl = Get-Acl -LiteralPath $aclTestPath
-            $acl.SetAccessRuleProtection($true, $false)
+            # Keep infrastructure-specific grants (including restricted-token
+            # sandbox access) while removing the broad groups under test.
+            $acl.SetAccessRuleProtection($true, $true)
+            foreach ($existingRule in $acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier])) {
+                if ($existingRule.IdentityReference.Value -in @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545')) {
+                    $acl.RemoveAccessRuleSpecific($existingRule)
+                }
+            }
             $acl.SetOwner($testSid)
             $ownerRule = [Security.AccessControl.FileSystemAccessRule]::new($testSid, 'FullControl', 'Allow')
             $acl.SetAccessRule($ownerRule)
-            Set-Acl -LiteralPath $aclTestPath -AclObject $acl
+            Set-TestSourceAcl $aclTestPath $acl
             if (-not (Test-PowerShellModernPrivateSource $aclTestPath)) { throw 'Private source was rejected' }
             foreach ($broadSid in @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545')) {
                 $rule = [Security.AccessControl.FileSystemAccessRule]::new(
                     [Security.Principal.SecurityIdentifier]::new($broadSid), 'Write', 'Allow')
                 $acl.AddAccessRule($rule)
-                Set-Acl -LiteralPath $aclTestPath -AclObject $acl
+                Set-TestSourceAcl $aclTestPath $acl
                 if (Test-PowerShellModernPrivateSource $aclTestPath) { throw "Broadly writable source was accepted: $broadSid" }
                 $acl.RemoveAccessRuleSpecific($rule)
-                Set-Acl -LiteralPath $aclTestPath -AclObject $acl
+                Set-TestSourceAcl $aclTestPath $acl
                 if (-not (Test-PowerShellModernPrivateSource $aclTestPath)) { throw 'Updated ACL was not rechecked' }
             }
         }
