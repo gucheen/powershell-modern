@@ -1,6 +1,6 @@
 # PowerShell Modern for Windows
 
-这是 Bash Modern Server 的 Windows PowerShell 复刻版，面向日常 Windows 开发环境。第一版只使用 PowerShell 与 Windows 自带能力，不安装第三方软件，也不包含 Docker、systemd、MTR 或第三方提示符等相关命令。
+这是 Bash Modern Server 的 Windows PowerShell 复刻版，面向日常 Windows 开发环境。基础功能只使用 PowerShell 与 Windows 自带能力，并可选集成 fd 和 fzf。安装器不自动安装第三方软件，也不包含 Docker、systemd、MTR 或第三方提示符等相关命令。
 
 支持 Windows PowerShell 5.1 与 PowerShell 7。两者使用各自的 `$PROFILE.CurrentUserAllHosts`，因此请用日常实际使用的 PowerShell 执行安装器。
 安装只写入当前用户目录，不需要也不建议使用“以管理员身份运行”的终端。
@@ -14,6 +14,7 @@
 - 按“公开通用、私有命令包、单机配置”三层加载命令，个人缩写优先。
 - 通过 `# @cmd 分类 | 用法 | 说明` 元数据发现和搜索命令。
 - 提供带路径缩写和 Git 状态的纯 PowerShell 原生提示符，以及 `ports`、`mem`、`winlog` 等 Windows 原生命令。
+- 可选使用 fd 和 fzf 搜索文件、跳转目录和选择历史命令。
 
 ## 安装
 
@@ -147,6 +148,41 @@ ports                # 显示监听中的 TCP 与 UDP 端点
 mem                  # 显示物理内存总量、已用量与使用率
 winlog System 100    # 显示最近 100 条 System 事件日志
 ```
+
+## fd 与 fzf（可选）
+
+先按 [fd 官方说明](https://github.com/sharkdp/fd#installation) 和 [fzf 官方说明](https://github.com/junegunn/fzf#installation) 安装工具，例如：
+
+```powershell
+winget install --id sharkdp.fd --exact
+winget install --id junegunn.fzf --exact
+```
+
+重新打开终端以更新 PATH，然后重新运行本项目的 `install.ps1` 并加载 Profile。
+
+```powershell
+fd '\.ps1$'          # 按名称搜索文件，支持 fd 原生参数
+fd --type d          # 搜索目录
+fd --type f | fzf    # 手动组合，也可直接使用 fzf
+ff                  # 选择文件，输出相对当前目录的路径
+ff readme           # 使用初始查询词
+cdf                 # 选择子目录并进入
+fh git              # 选择历史命令并输出文本
+```
+
+加载 Profile 时检测到工具后，会启用以下 PSReadLine 快捷键：
+
+| 快捷键 | 功能 | 依赖 |
+|---|---|---|
+| `Ctrl+T` | 在光标处插入选中的文件路径，自动使用 PowerShell 单引号转义 | fd、fzf |
+| `Alt+C` | 选择子目录并跳转 | fd、fzf |
+| `Ctrl+R` | 搜索历史并替换当前编辑行，按回车才执行 | fzf |
+
+文件和目录选择包含隐藏项、排除 `.git`，并遵守 fd 的忽略规则。历史搜索包含 PSReadLine 保存的历史和当前会话历史，去重后优先显示最近的命令；输入框位于底部，候选记录从下向上排列，暂时跳过多行命令。按 Esc 或 Ctrl+C 取消选择时，不修改目录或编辑行。
+
+检测到 fd 且尚未设置 `FZF_DEFAULT_COMMAND` 时，会将其默认文件来源设为 `fd --type f --color never --hidden --exclude .git`。已有的 fzf 环境配置会保留；本项目的选择器强制单选及逐行输出。可在 `user\local.ps1` 自定义环境变量或覆盖快捷键。
+
+缺少依赖不会阻止 Profile 加载；调用相关命令时会提示安装方法。`powershell-modern doctor` 会显示两个工具的可执行文件路径或可选依赖缺失状态。
 
 ## 备份、回滚与卸载
 

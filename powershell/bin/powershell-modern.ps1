@@ -68,6 +68,11 @@ function Show-Doctor {
     $psReadLine = Get-Module -ListAvailable -Name PSReadLine | Sort-Object Version -Descending | Select-Object -First 1
     if ($psReadLine) { '{0,-18} {1}' -f 'PSReadLine', $psReadLine.Version }
     else { '{0,-18} {1}' -f 'PSReadLine', 'missing' }
+    foreach ($toolName in @('fd', 'fzf')) {
+        $tool = Get-Command $toolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+        $status = if ($tool) { $tool.Source } else { 'not installed (optional)' }
+        '{0,-18} {1}' -f $toolName, $status
+    }
     if ($failed) { $global:LASTEXITCODE = 1 } else { $global:LASTEXITCODE = 0 }
 }
 

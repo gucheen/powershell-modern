@@ -12,6 +12,7 @@ New-Item -ItemType Directory -Path $testHome -Force | Out-Null
 Set-Content -LiteralPath $env:POWERSHELL_MODERN_PROFILE -Value @('# original', 'function mine { $true }') -Encoding UTF8
 
 try {
+    & (Join-Path $PSScriptRoot 'test-fuzzy.ps1')
     . (Join-Path $projectRoot 'powershell\powershell.d\35-NativePrompt.ps1')
     $compactPath = Format-PowerShellModernPath -Path 'C:\Users\alice\projects\powershell-modern' -HomePath 'C:\Users\alice'
     if ($compactPath -ne '~\p\powershell-modern') { throw "Unexpected compact path: $compactPath" }
@@ -50,6 +51,7 @@ try {
     if ([regex]::Matches($profileText, [regex]::Escape('# >>> powershell-modern >>>')).Count -ne 1) { throw 'Managed block count is not one' }
     if (-not (Test-Path -LiteralPath (Join-Path $env:POWERSHELL_MODERN_HOME 'powershell.d\40-Abbreviations.ps1'))) { throw 'Abbreviation module is missing' }
     if (-not (Test-Path -LiteralPath (Join-Path $env:POWERSHELL_MODERN_HOME 'commands.d\20-Common.ps1'))) { throw 'Command library is missing' }
+    if (-not (Test-Path -LiteralPath (Join-Path $env:POWERSHELL_MODERN_HOME 'commands.d\30-FuzzyFind.ps1'))) { throw 'Fuzzy finder integration is missing' }
 
     # Use fresh processes so module caches and the loader guard cannot hide failures.
     $loaderProbe = Join-Path $testRoot 'loader-probe.ps1'
@@ -132,6 +134,10 @@ if (-not [object]::ReferenceEquals($sources, $global:PowerShellModernCommandSour
     . (Join-Path $env:POWERSHELL_MODERN_HOME 'powershell.d\45-CommandLibrary.ps1')
     if (-not (Get-Command ports -ErrorAction SilentlyContinue)) { throw 'ports was not loaded' }
     if ((cmds network | Out-String) -notmatch 'ports') { throw 'Command discovery failed' }
+    if ((cmds search | Out-String) -notmatch 'ff \[query\]') { throw 'Fuzzy command discovery failed' }
+    $doctorOutput = & (Join-Path $env:POWERSHELL_MODERN_HOME 'bin\powershell-modern.ps1') doctor
+    if (($doctorOutput -join "`n") -notmatch '(?m)^fd\s+' -or ($doctorOutput -join "`n") -notmatch '(?m)^fzf\s+') { throw 'Doctor did not report optional tools' }
+    if ($LASTEXITCODE -ne 0) { throw 'Optional dependencies caused doctor to fail' }
 
     & (Join-Path $projectRoot 'install.ps1')
     if (-not (Test-Path -LiteralPath (Join-Path $env:POWERSHELL_MODERN_HOME 'user\abbreviations.json'))) { throw 'User abbreviations were not preserved' }
